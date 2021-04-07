@@ -1,0 +1,19 @@
+Workspace ONE Intelligent Hub for Linux Privacy Statement
+
+
+Your privacy matters
+We respect your right to privacy. VMware Workspace ONE collects information that is required to provide secure access to your work data and applications. Below you will find an overview of data collected by Workspace ONE and Hub to provide optimal performance, security and support. For information about how your company handles information collected by Workspace ONE, please contact your company.
+
+Contact your IT administrator if you want to find out how to un-enroll your device and discontinue access to this app.
+
+Device Management
+This app may collect information from this device to provide access to work resources and ensure that data on this device is kept secure.
+
+Data collected by the Workspace ONE Intelligent Hub
+This app may collect information about device hardware, diagnostics and user information to function properly, and ensure company data stored on this device is secure. Some data collected may be visible to your IT administrator.
+
+Workspace ONE Intelligent Hub permissions
+Some features require access to capabilities on this device to function properly. These permissions can be changed at any time within your device settings but may impact app functionality.
+
+More Information
+For more information about how your employer handles information collected by this app please go to https://www.vmware.com/help/privacy/uem-privacy-disclosure.html

@@ -1,0 +1,32 @@
+<root>
+    <install>
+        include wifi
+        class wifi {
+            $make_active={{.MakeActive}}
+            package { 'network-manager' :
+                ensure => installed,
+            }
+            exec { 'nmclicreate' :
+                command => "{{.Command}}",
+            }
+            if $make_active == true {
+                exec { 'nmcliconnect' :
+                            command => "/usr/bin/nmcli connection up {{.SSID}} || true",
+                            require => Exec['nmclicreate']
+                        }
+            }
+        }
+    </install>
+    <uninstall>
+        include wifi
+        class wifi {
+            package { 'network-manager' :
+                ensure => installed,
+            }
+            exec { 'nmcliremove' :
+                command => "{{.Command}}",
+                require => Package['network-manager']
+            }
+        }
+    </uninstall>
+</root>

@@ -1,0 +1,30 @@
+<root>
+    <install>
+	include certs
+	include certconfig
+
+        class certconfig {
+               	$domain = '{{.Name}}'
+               	certs::site { $domain:
+                       	source_path    => '{{.Path}}',
+                       	ca_cert        => {{.IsCA}},
+                       	service        => false,
+			ca_name	       => '{{.CAName}}',
+			ensure	       => 'present',
+               	}
+        }
+    </install>
+    <uninstall>
+	include certs
+	include certconfig
+
+        class certconfig {
+                $domain = '{{.Name}}'
+               	certs::site { $domain:
+                       	source_path    => '{{.Path}}',
+                       	service        => false,
+			ensure	       => 'absent',
+               	}
+        }
+    </uninstall>
+</root>

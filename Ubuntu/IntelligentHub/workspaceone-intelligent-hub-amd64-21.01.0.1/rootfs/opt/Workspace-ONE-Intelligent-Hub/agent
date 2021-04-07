@@ -1,0 +1,307 @@
+#!/usr/bin/env sh
+#
+# Copyright (C) 2019 VMware, Inc. All rights reserved.
+# This product is protected by copyright and intellectual property laws in
+# the United States and other countries as well as by international treaties.
+# VMware products may be covered by one or more patents listed at
+# https://www.vmware.com/go/patents.
+#
+
+#
+# A utility script for ws1Hub to trigger actions
+# like : start, stop, status, uninstall or unenroll
+#
+
+CONF_NAME="ws1Hub"
+WS1RC_FILE="/etc/$CONF_NAME.conf"
+LOG_DIR="$(awk -F '[<>]' '/logs/ {print $3}' /etc/$CONF_NAME.conf)"
+LOGFILE="$LOG_DIR/agent.log"
+OPENRCFILE="ws1Hubd"
+
+MKDIR=$(command -v mkdir)
+CHOWN=$(command -v chown)
+PS=$(command -v ps)
+AWK=$(command -v awk)
+XARGS=$(command -v xargs)
+SED=$(command -v sed)
+RM=$(command -v rm)
+
+init_log() {
+    # If the log directories are in volatile filesystem, then it has to be
+    # created during agent startup post-reboot
+    [ -d "$LOGDIR" ] || "$MKDIR" -p "$LOG_DIR"
+    
+    "$CHOWN" -R ws1user:ws1user "$LOG_DIR"
+    if [ ! -f "$LOGFILE" ]; then
+        >>"$LOGFILE"
+        "$CHOWN" 640 "$LOGFILE"
+    fi
+}
+
+log() {
+    echo "$(date) : $@" >>"$LOGFILE"
+    echo "$(date) : $@"
+}
+
+die() {
+    log $@
+    echo >&2 $@
+    exit 1
+}
+
+process_status() {
+    "$PS" -eo comm,pid | "$AWK" '{print $1,$2}' | grep "^$1\s" >/dev/null 2>&1
+}
+
+process_kill() {
+    "$PS" -eo comm,pid | "$AWK" '{print $1,$2}' | grep "^$1\s" | "$AWK" '{print $2}' |
+        "$XARGS" kill -9 >/dev/null 2>&1
+}
+
+usage() {
+    echo "Usage:"
+    echo "$0 [start | stop | status| unenroll | uninstall | restart | help]"
+}
+
+################################################################################
+# main
+################################################################################
+
+# checks for prerequisites
+################################################################################
+#if [ $(id -u) -ne 0 ]; then
+#    log "You must be a root user"
+#    exit 1
+#fi
+
+if [ ! -f $WS1RC_FILE ]; then
+    log "$WS1RC_FILE not found"
+    exit 1
+fi
+
+WS1HOME=$("$AWK" -F '[<>]' '/<home>/ {print $3}' $WS1RC_FILE)
+WS1BIN=$("$AWK" -F '[<>]' '/<bin>/ {print $3}' $WS1RC_FILE)
+WS1DATA=$("$AWK" -F '[<>]' '/<data>/ {print $3}' $WS1RC_FILE)
+WS1CONF=$("$AWK" -F '[<>]' '/<config>/ {print $3}' $WS1RC_FILE)
+AGENTBIN="$WS1BIN"/ws1HubAgent
+
+init_log
+command -v systemctl >>"$LOGFILE" 2>&1 && [ -d /run/systemd/system ]
+systemd_supported=$?
+
+command -v rc-update >>"$LOGFILE" 2>&1
+open_rc_exists=$?
+
+command -v start-stop-daemon >>"$LOGFILE" 2>&1
+start_stop_daemon_exists=$?
+
+# Operations
+case "$1" in
+start)
+    #
+    # Start action:
+    #Starts the agent
+    ############################################################################
+    log "start ws1Hub services"
+
+    exitstatus=1
+    confirms=0
+    failures=0
+
+    # Start agent services
+    "$WS1BIN"/ws1HubUtil -stopService
+    sleep 2
+
+    if [ $systemd_supported -eq 0 ]; then
+        command [ -f /etc/systemd/system/$CONF_NAME.service ] &&
+        systemctl reset-failed $CONF_NAME.service >>"$LOGFILE" 2>&1 &&
+        systemctl restart $CONF_NAME.service >>"$LOGFILE" 2>&1
+        log "ws1HubAgent started : $?"
+    elif [ $start_stop_daemon_exists -eq 0 ]; then
+        log "starting daemon $AGENTBIN"
+        start-stop-daemon --start --background --exec "$AGENTBIN" >>"$LOGFILE" 2>&1
+	log "ws1HubAgent started : $?"
+    else
+	log "starting daemon $AGENTBIN"
+        "$WS1BIN"/ws1HubAgent >>"$LOGFILE" 2>&1 &
+	log "ws1HubAgent started : $?"
+    fi
+    
+    # Confirm twice if successful or retry 5 times
+    while [ $confirms -le 1 ]; do
+        # Give it some time to make sure they are service for a while
+        log "waiting for confirming process status"
+        sleep 2
+
+        process_status ws1HubAgent
+        exitstatus=$?
+        log "ws1HubAgent running status : $exitstatus"
+
+        # Update successful confirmation or failures
+        if [ 0 -eq $exitstatus ]; then
+            confirms=$((confirms + 1))
+            log "ws1HubAgent status confirmation : $confirms"
+        else
+            failures=$((failures + 1))
+            log "ws1HubAgent failure confirmation : $failures"
+            if [ $failures -gt 5 ]; then
+                log "ws1HubAgent services failed to be started successfully"
+            exit 5
+            fi
+            if [ $systemd_supported -eq 0 ]; then
+		command [ -f /etc/systemd/system/$CONF_NAME.service ] &&
+		systemctl reset-failed $CONF_NAME.service >>"$LOGFILE" 2>&1 &&
+		systemctl restart $CONF_NAME.service >>"$LOGFILE" 2>&1
+		log "ws1HubAgent started : $?"
+	    elif [ $start_stop_daemon_exists -eq 0 ]; then
+                log "starting daemon $AGENTBIN"
+                start-stop-daemon --start --background --exec "$AGENTBIN" >>"$LOGFILE" 2>&1
+	        log "ws1HubAgent started : $?"
+            else
+	        log "starting daemon $AGENTBIN"
+                "$WS1BIN"/ws1HubAgent >>"$LOGFILE" 2>&1 &
+	         log "ws1HubAgent started : $?"
+            fi
+        fi
+    done
+    ;;
+
+stop)
+    # Stop section
+    #   Stop agent services
+    ############################################################################
+    "$WS1BIN"/ws1HubUtil -stopService
+    process_kill ws1HubAgent
+
+    if [ $systemd_supported -eq 0 ]; then
+        command [ -f /etc/systemd/system/$CONF_NAME.service ] &&
+        systemctl status $CONF_NAME.service >>"$LOGFILE" 2>&1 &&
+        systemctl stop $CONF_NAME.service >>"$LOGFILE" 2>&1
+    elif [ $start_stop_daemon_exists -eq 0 ]; then
+	pid=`"$PS" -A|grep ws1HubAgent|"$AWK" -F " " '{print $1}'`
+	if [ "$pid" ]; then
+		start-stop-daemon --stop --pid "$pid" >>"$LOGFILE" 2>&1
+	fi
+	log "ws1HubAgent stopped : $?"
+    else
+	pid=`"$PS" -A|grep ws1HubAgent|"$AWK" -F " " '{print $1}'`
+	if [ "$pid" ]; then
+		kill -9 $pid
+	fi
+	log "ws1HubAgent stopped : $?"
+    fi
+    ;;
+status)
+    # Status section
+    ############################################################################
+    process_status ws1HubAgent
+    if [ $? -eq 0 ]; then
+            exit 0
+    fi
+    exit 1
+    ;;
+cleanup)
+    if [ -f "$WS1CONF"/General-Config.cfg ]; then
+        WS1_USER=$("$AWK" -F "=" '/^UserName/{print $2}' \
+            "$WS1CONF"/General-Config.cfg | "$SED" -e 's/^\s*"\(.*\)"$/\1/')
+        REMOVE_USER=$("$AWK" -F "=" '/^RemoveUserOnUninstall/{print $2}' \
+            "$WS1CONF"/General-Config.cfg)
+		
+        id -u $WS1_USER >/dev/null 2>&1
+        if [ $? -eq 0 ] && [ $REMOVE_USER -eq 1 ]; then
+            command -v userdel >>"$LOGFILE" 2>&1 &&
+                userdel $WS1_USER >>"$LOGFILE" 2>&1
+            command -v busybox >>"$LOGFILE" 2>&1 &&
+                busybox deluser $WS1_USER >>"$LOGFILE" 2>&1
+        fi
+    fi
+
+    if [ $systemd_supported -eq 0 ] && [ -f /etc/systemd/system/$CONF_NAME.service ]; then
+        systemctl disable $CONF_NAME.service >>"$LOGFILE" 2>&1
+        systemctl daemon-reload >>"$LOGFILE" 2>&1
+        systemctl reset-failed $CONF_NAME.service >>"$LOGFILE" 2>&1
+        "$RM" /etc/systemd/system/$CONF_NAME.service
+    fi
+
+    if [ $open_rc_exists -eq 0 ] && [ -f /etc/init.d/"$OPENRCFILE" ]; then
+        rc-service stop "$OPENRCFILE" >>"$LOGFILE" 2>&1
+        rc-update delete "$OPENRCFILE" default >>"$LOGFILE" 2>&1
+        "$RM" /etc/init.d/"$OPENRCFILE" >>"$LOGFILE" 2>&1
+    fi
+
+    # Remove agent directory and configs
+    "$RM" -f /etc/$CONF_NAME.conf
+    "$RM" -f /etc/init.d/$CONF_NAME
+
+    #remove inittab entry
+    if [ -f /etc/inittab ]; then
+       "$SED" -i '/ws1/d' /etc/inittab
+    fi
+
+    #remove rc.local entry for Slackware
+    if [ -d /etc/rc.d ]; then
+       "$SED" -i '/ws1/d' /etc/rc.d/rc.local
+    fi
+
+    #remove rc.local entry for Void
+    if [ -x /etc/rc.local ]; then
+       "$SED" -i '/ws1/d' /etc/rc.local
+    fi
+    ;;
+uninstall)
+    # Uninstall section
+    ############################################################################
+    # Stop the ws1Hub agent
+    "$0" stop
+
+    log "waiting for process to be stopped"
+    sleep 5
+
+    # Stop other agent processes
+    process_kill ws1HubAgent
+
+    if [ -f "$WS1CONF"/General-Config.cfg ]; then
+        WS1_USER=$("$AWK" -F "=" '/^UserName/{print $2}' \
+            "$WS1CONF"/General-Config.cfg | "$SED" -e 's/^\s*"\(.*\)"$/\1/')
+        REMOVE_USER=$("$AWK" -F "=" '/^RemoveUserOnUninstall/{print $2}' \
+            "$WS1CONF"/General-Config.cfg)
+		
+        id -u $WS1_USER >/dev/null 2>&1
+        if [ $? -eq 0 ] && [ $REMOVE_USER -eq 1 ]; then
+            command -v userdel >>"$LOGFILE" 2>&1 &&
+                userdel $WS1_USER >>"$LOGFILE" 2>&1
+            command -v busybox >>"$LOGFILE" 2>&1 &&
+                busybox deluser $WS1_USER >>"$LOGFILE" 2>&1
+        fi
+    fi
+
+    # Remove logs
+    if [ ! -f "$WS1CONF"/.keep-logs ]; then
+      "$RM" -rf "$LOG_DIR"
+    fi
+
+    ;;
+unenroll)
+    # Unenroll section
+
+    ############################################################################
+    # trigger unenrollment of agent
+    "$WS1BIN"/ws1HubUtil -unenroll
+
+    ;;
+restart)
+    # Restart section
+    ############################################################################
+    "$0" stop
+    "$0" start
+    ;;
+help)
+    usage
+    ;;
+*)
+    usage
+    exit 1
+    ;;
+esac
+
+exit 0

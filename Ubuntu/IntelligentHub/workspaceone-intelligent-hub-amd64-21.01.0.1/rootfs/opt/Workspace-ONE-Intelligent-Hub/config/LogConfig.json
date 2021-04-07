@@ -1,0 +1,24 @@
+{"logConfig":[
+		{"exeName":"*",
+			"configs":{
+				"maxFileSizeKb":1024,
+				"filesToKeep":1,
+				"logLevel":3
+			}
+		},
+		{"exeName":"ws1HubAgent",
+			"configs":{
+				"maxFileSizeKb":1024,
+				"filesToKeep":1,
+				"logLevel":3
+			}
+		},
+		{"exeName":"ws1HubEnroll",
+			"configs":{
+				"maxFileSizeKb":1024,
+				"filesToKeep":1,
+				"logLevel":4
+			}
+		}
+ ]
+}

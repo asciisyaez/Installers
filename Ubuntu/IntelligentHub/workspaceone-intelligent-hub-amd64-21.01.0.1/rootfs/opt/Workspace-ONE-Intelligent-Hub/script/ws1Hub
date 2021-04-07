@@ -1,0 +1,114 @@
+#!/bin/sh
+#
+# Copyright (C) 2019 VMware, Inc. All rights reserved.
+# This product is protected by copyright and intellectual property laws in
+# the United States and other countries as well as by international treaties.
+# VMware products may be covered by one or more patents listed at
+# https://www.vmware.com/go/patents.
+#
+
+# Do not remove the below two lines.  They are required for chkconfig
+# chkconfig: 2345 99 01
+# description: ws1Hub agent startup script
+# end do not remove the above two lines.
+
+##345 - levels to configure
+##99 - startup order
+##01 - stop order
+
+
+# Do not remove the below two lines.  They are required for chkconfig
+# chkconfig: 2345 99 01
+# description: Workspace ONE Intelligent Hub agent startup script
+# end do not remove the above two lines.
+
+##345 - levels to configure
+##99 - startup order
+##01 - stop order
+
+
+### BEGIN INIT INFO
+# Provides:             ws1Hub
+# Required-Start:       $all
+# Required-Stop:
+# Default-Start:        2 3 4 5
+# Default-Stop:
+# Short-Description:    Workspace ONE Intelligent Hub agent restart
+### END INIT INFO
+
+CONF_NAME="ws1Hub"
+AGENT_CONF=/etc/$CONF_NAME.conf
+
+MKDIR=$(command -v mkdir)
+CHOWN=$(command -v chown)
+AWK=$(command -v awk)
+CHMOD=$(command -v chmod)
+
+if [ ! -f $AGENT_CONF ]; then
+    exit 0
+fi
+
+WS1HOME=$("$AWK" -F '[<>]' '/<home>/ {print $3}' $AGENT_CONF)
+WS1BIN=$("$AWK" -F '[<>]' '/<bin>/ {print $3}' $AGENT_CONF)
+WS1CONF=$("$AWK" -F '[<>]' '/<config>/ {print $3}' $AGENT_CONF)
+LOG_DIR=$("$AWK" -F '[<>]' '/<logs>/ {print $3}' $AGENT_CONF)
+LOGFILE="$LOG_DIR"/$CONF_NAME.log
+
+init_log() {
+    # If the log directories are in volatile filesystem, then it has to be
+    # created during agent startup post-reboot
+    "$MKDIR" -p "$LOG_DIR"
+    "$CHMOD" -R 640 "$LOG_DIR"/
+    "$CHMOD" 700 "$LOG_DIR"
+    
+    "$CHOWN" -R ws1user:ws1user "$LOG_DIR"
+    
+    if [ ! -f "$LOGFILE" ]; then
+        >>"$LOGFILE"
+        "$CHMOD" 640 "$LOGFILE"
+    fi
+}
+
+log() {
+    echo "$(date) : $@" >>"$LOGFILE"
+    echo "$(date) : $@"
+}
+
+
+#
+# This is a init.d script for restarting ws1Hub agent during reboots
+################################################################################
+# main
+################################################################################
+init_log
+
+log $0 "$WS1HOME"
+
+case "$1" in
+start)
+    log "Starting airwatch services"
+    "$WS1HOME"/agent start 
+    ;;
+stop)
+    log "Stopping airwatch services"
+    "$WS1HOME"/agent stop 
+    ;;
+restart)
+    $0 stop
+    $0 start
+    ;;
+force-reload)
+    $0 restart
+    ;;
+status)
+    log "airwatch service status"
+    "$WS1HOME"/agent status
+    ;;
+*)
+    log "Invalid option"
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0

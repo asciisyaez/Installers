@@ -1,0 +1,14 @@
+[Unit]
+Description=Workspace ONE Intelligent Hub
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5s
+ExecStart=/opt/Workspace-ONE-Intelligent-Hub/bin/ws1HubAgent
+ExecStop=/opt/Workspace-ONE-Intelligent-Hub/bin/ws1HubUtil -stopService
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target

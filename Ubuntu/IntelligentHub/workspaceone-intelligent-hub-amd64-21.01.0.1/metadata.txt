@@ -1,0 +1,12 @@
+Name: workspaceone-intelligent-hub
+Version: 21.01.0.1
+Summary: VMware Workspace ONE Hub Agent
+License: VMware <vgade@vmware.com>
+URL: http://www.vmware.com
+Provides: ws1HubAgent, ws1HubUtil, ws1Hub.service
+Requires: coreutils
+Recommends: ruby, puppet-agent, osquery
+Release: 1
+Description
+VMware Workspace ONE Hub Agent
+
