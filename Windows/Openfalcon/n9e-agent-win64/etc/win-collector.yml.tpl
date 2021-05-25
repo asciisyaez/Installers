@@ -48,8 +48,6 @@ sys:
   mountPoint: []
   mountIgnorePrefix:
     - /var/lib
-  ntpServers:
-    - time.google.com
   plugin: plugin/
   ignoreMetrics:
     - cpu.core.idle
