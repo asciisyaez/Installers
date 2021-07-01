@@ -8,7 +8,7 @@ echo -e "##########################################################"
 
 echo -e ""
 echo -e "##################################################################################"
-echo -e "## Ensure the Boot Config File is only Owned by root and Set to Eead/Write only ##"
+echo -e "## Ensure the Boot Config File is only Owned by root and Set to Read/Write only ##"
 echo -e "## Command: ls -l /boot/grub2/grub.cfg                                          ##"
 echo -e "##################################################################################"
 ls -l /boot/grub2/grub.cfg
